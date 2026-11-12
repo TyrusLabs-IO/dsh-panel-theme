@@ -2,6 +2,8 @@
 
 插件包名：`dsh-panel-theme`
 
+> A configurable sidebar background theme for DeepSeek Harness: base color and opacity, gradient, glow, readability veil, quick presets, and JSON backup. Everything runs locally in the browser.
+
 为 DeepSeek Harness 左侧边栏添加可调的背景样式：渐变、光晕与透明度。
 
 ## 功能
@@ -17,10 +19,29 @@
 
 ## 安装
 
-在 Harness 中通过插件管理器安装本目录：
+### 通过 DSH Market 安装
+
+收录后，在 **Plugins → Plugin Market → Themes** 中搜索 **Sidebar Theme**，点击安装并刷新 Web 页面。
+
+### 手动安装
+
+需要支持 Web UI 插件的 DeepSeek Harness。先克隆仓库：
+
+```sh
+git clone https://github.com/TyrusLockwood/dsh-panel-theme.git
+cd dsh-panel-theme
+```
+
+然后安装当前目录（路径必须是绝对路径）：
+
+```sh
+dsh plugin add "$PWD"
+```
+
+也可以在 Harness 中让 agent 执行：
 
 ```text
-plugin_manager action=install_bundle target=/Users/Tyrus/Desktop/Cook/Tyrus/dsh-panel-theme
+plugin_manager action=install_bundle target=/absolute/path/to/dsh-panel-theme
 ```
 
 安装后刷新 Web 页面，在 **设置 → 侧边栏样式** 中打开「自定义侧边栏背景」。
@@ -42,6 +63,10 @@ plugin_manager action=install_bundle target=/Users/Tyrus/Desktop/Cook/Tyrus/dsh-
 
 导出/导入只读写本地文件，不经过网络，也不包含任何账号信息。
 
+## 相关项目 / Related project
+
+- [Tabbiy](https://tabbiy.top/) — Chrome 垂直标签页管理与自动分组扩展。独立项目，不属于本插件。
+
 ## 兼容性说明
 
 - 插件只给侧边栏的布局列增加背景层，不替换原生侧边栏组件。
@@ -52,10 +77,19 @@ plugin_manager action=install_bundle target=/Users/Tyrus/Desktop/Cook/Tyrus/dsh-
 ## 结构
 
 ```text
-package.json       # DSH bundle 与 client 入口声明
-cordis.patch.yml   # 插件安装行
-index.js           # Host 侧占位
-client.js          # 设置页面、样式注入与浏览器存储
-locale/            # 插件目录与设置页文案（en / zh）
-icon.svg           # 插件图标
+package.json        # DSH bundle 与 client 入口声明
+cordis.patch.yml    # 插件安装行
+index.js            # Host 侧占位
+client.js           # 设置页面、样式注入与浏览器存储
+locale/             # 插件目录与设置页文案（en / zh）
+icon.svg            # 插件矢量图标
+icon.png            # 市场卡片用 512×512 位图
+marketplace/        # DSH Market 条目草稿
+MARKETPLACE.md      # 上架检查清单
+LICENSE             # MIT
+README.md
 ```
+
+## License
+
+MIT。第三方项目 Tabbiy 不属于本插件，其名称与链接仅用于相关项目说明。

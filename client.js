@@ -111,6 +111,10 @@ window.__ModuleLoader__.load({
       'io.invalid': 'Could not read this file. The format or version is not supported.',
       'io.version': 'This backup was created by a newer version and cannot be imported.',
       'io.tooLarge': 'The file is too large. The maximum size is 2 MB.',
+      'related.title': 'Related project',
+      'related.hint':
+        'Tabbiy is a separate Chrome extension for vertical tabs and auto-grouping. It is not part of this plugin.',
+      'related.link': 'Visit Tabbiy',
       reset: 'Reset',
       'surface.title': 'Surface',
       'surface.hint': 'The base color, transparency, and text contrast of the sidebar.',
@@ -185,6 +189,9 @@ window.__ModuleLoader__.load({
       'io.invalid': '无法读取该文件：格式或版本不受支持。',
       'io.version': '该备份由更新版本创建，当前版本无法导入。',
       'io.tooLarge': '文件过大，最大支持 2 MB。',
+      'related.title': '相关项目',
+      'related.hint': 'Tabbiy 是一个独立的 Chrome 垂直标签页管理与自动分组扩展，不是本插件的功能。',
+      'related.link': '访问 Tabbiy',
       reset: '重置',
       'surface.title': '底层',
       'surface.hint': '设置基础颜色、透明度，以及侧边栏文字对比度。',
@@ -417,6 +424,27 @@ window.__ModuleLoader__.load({
       .dst-io-actions .dst-reset {
         margin-left: 0;
         border-color: var(--dsw-alias-border-l1);
+      }
+      .dst-related-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        padding: 7px 11px;
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: 8px;
+        color: var(--dsw-alias-brand-primary);
+        font-size: 12px;
+        font-weight: 500;
+        text-decoration: none;
+      }
+      .dst-related-link:hover {
+        background: var(--dsw-alias-bg-layer-1);
+      }
+      .dst-related-link::after {
+        content: '↗';
+        font-size: 11px;
+        opacity: .75;
       }
       .dst-file-input {
         position: absolute;
@@ -1588,6 +1616,20 @@ ${contentTokens(p.content)}
               'aria-hidden': 'true',
               onChange: importFile,
             }),
+          ),
+        ),
+        h(
+          Card,
+          { title: tr('related.title'), hint: tr('related.hint') },
+          h(
+            'a',
+            {
+              className: 'dst-related-link',
+              href: 'https://tabbiy.top/',
+              target: '_blank',
+              rel: 'noopener noreferrer',
+            },
+            tr('related.link'),
           ),
         ),
         h('div', { className: 'dst-footnote' }, tr('footnote')),
