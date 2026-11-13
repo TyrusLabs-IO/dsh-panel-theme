@@ -8,7 +8,6 @@ window.__ModuleLoader__.load({
     const SECTION_ID = 'dsh-panel-theme';
     const STORAGE_KEY = 'dsh-panel-theme.prefs.v1';
     const LEGACY_STORAGE_KEY = 'dsh-sidebar-theme.prefs.v1';
-    const CONTENT_AUTO_MIGRATION_KEY = 'dsh-panel-theme.content-auto.v1';
     // One-time cleanup for the old user-saved duplicate of the twilight-light preset.
     const PRESET_CLEANUP_KEY = 'dsh-panel-theme.preset-cleanup.v3';
     const DUPLICATE_PRESET_NAMES = new Set(['暮光(浅)']);
@@ -21,7 +20,7 @@ window.__ModuleLoader__.load({
       enabled: false,
       opacity: 1,
       baseColor: '#0f172a',
-      content: 'auto',
+      content: 'light',
       gradient: {
         enabled: true,
         from: '#2563eb',
@@ -125,11 +124,10 @@ window.__ModuleLoader__.load({
       'related.link': 'Visit Tabbiy',
       reset: 'Reset',
       'surface.title': 'Surface',
-      'surface.hint': 'The base color, transparency, and text contrast of the sidebar.',
+      'surface.hint': 'Set the base color, opacity, and sidebar text contrast. Opacity 100% means fully opaque. Choose dark text for light backgrounds.',
       'surface.baseColor': 'Base color',
       'surface.opacity': 'Opacity',
       'surface.content': 'Content color',
-      'surface.contentAuto': 'Auto contrast',
       'surface.contentLight': 'Light text',
       'surface.contentDark': 'Dark text',
       'gradient.title': 'Gradient',
@@ -205,11 +203,10 @@ window.__ModuleLoader__.load({
       'related.link': '访问 Tabbiy',
       reset: '重置',
       'surface.title': '底层',
-      'surface.hint': '设置基础颜色、透明度，以及侧边栏文字对比度。',
+      'surface.hint': '设置基础颜色、不透明度，以及侧边栏文字对比度。不透明度 100% 表示完全不透明；浅色背景请选择深色文字。',
       'surface.baseColor': '基础颜色',
-      'surface.opacity': '透明度',
+      'surface.opacity': '不透明度',
       'surface.content': '内容文字',
-      'surface.contentAuto': '自动适配',
       'surface.contentLight': '浅色文字',
       'surface.contentDark': '深色文字',
       'gradient.title': '渐变',
@@ -807,7 +804,7 @@ window.__ModuleLoader__.load({
             : undefined,
         opacity: numberOr(preset.opacity, DEFAULTS.opacity, 0, 1),
         baseColor: hexColor(preset.baseColor, DEFAULTS.baseColor),
-        content: enumOr(preset.content, ['auto', 'light', 'dark'], DEFAULTS.content),
+        content: enumOr(preset.content, ['light', 'dark'], DEFAULTS.content),
         gradient: sanitizeGradient(preset.gradient),
         glow: sanitizeGlow(preset.glow),
         veil: sanitizeVeil(preset.veil),
@@ -837,7 +834,7 @@ window.__ModuleLoader__.load({
         enabled: booleanOr(root.enabled, DEFAULTS.enabled),
         opacity: numberOr(root.opacity, DEFAULTS.opacity, 0, 1),
         baseColor: hexColor(root.baseColor, DEFAULTS.baseColor),
-        content: enumOr(root.content, ['auto', 'light', 'dark'], DEFAULTS.content),
+        content: enumOr(root.content, ['light', 'dark'], DEFAULTS.content),
         gradient: sanitizeGradient(root.gradient),
         glow: sanitizeGlow(root.glow),
         veil: sanitizeVeil(root.veil),
@@ -890,11 +887,9 @@ window.__ModuleLoader__.load({
     }
 
     function loadPrefs() {
-      let migrationPending = false;
       let presetCleanupPending = false;
       let presetRenamePending = false;
       try {
-        migrationPending = !window.localStorage.getItem(CONTENT_AUTO_MIGRATION_KEY);
         presetCleanupPending = !window.localStorage.getItem(PRESET_CLEANUP_KEY);
         presetRenamePending = !window.localStorage.getItem(PRESET_RENAME_KEY);
       } catch (error) {
@@ -933,19 +928,7 @@ window.__ModuleLoader__.load({
             });
           }
           let presetRenamePersisted = !renamedPresets;
-          let migratedContent = false;
-          if (migrationPending && parsed.content === 'light' && autoContentMode(parsed) !== 'light') {
-            parsed.content = 'auto';
-            migratedContent = true;
-          }
-          if (migrationPending) {
-            try {
-              window.localStorage.setItem(CONTENT_AUTO_MIGRATION_KEY, '1');
-            } catch (error) {
-              // A failed marker only means the migration can run again next time.
-            }
-          }
-          if (legacy || hadImage || migratedContent || cleanedPresets || renamedPresets) {
+          if (legacy || hadImage || cleanedPresets || renamedPresets) {
             try {
               window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
               if (legacy) window.localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -970,13 +953,6 @@ window.__ModuleLoader__.load({
             }
           }
           return parsed;
-        }
-        if (migrationPending) {
-          try {
-            window.localStorage.setItem(CONTENT_AUTO_MIGRATION_KEY, '1');
-          } catch (error) {
-            // Ignore unavailable storage; defaults already use automatic contrast.
-          }
         }
         if (presetCleanupPending) {
           try {
@@ -1056,23 +1032,6 @@ window.__ModuleLoader__.load({
       return `rgba(${color.r}, ${color.g}, ${color.b}, ${clamp(alpha, 0, 1).toFixed(3)})`;
     }
 
-    function relativeLuminance(hex) {
-      const color = rgb(hex);
-      const channel = (value) => {
-        const v = value / 255;
-        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-      };
-      return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
-    }
-
-    function autoContentMode(input) {
-      if (input.opacity < 0.6) return 'theme';
-      const luminance = relativeLuminance(input.baseColor);
-      const contrastWithLight = 1.05 / (luminance + 0.05);
-      const contrastWithDark = (luminance + 0.05) / 0.05;
-      return contrastWithDark >= contrastWithLight ? 'dark' : 'light';
-    }
-
     function contentTokens(theme) {
       if (theme === 'light') {
         return `  --dsw-alias-label-primary: #f8fafc;
@@ -1116,7 +1075,7 @@ window.__ModuleLoader__.load({
 
       const surface = 'div:has(> [data-slot="sidebar"])';
       const opacity = p.opacity;
-      const resolvedContent = p.content === 'auto' ? autoContentMode(p) : p.content;
+      const contentMode = p.content;
       const rules = [];
 
       rules.push(`${surface} {
@@ -1129,27 +1088,25 @@ window.__ModuleLoader__.load({
   background-color: transparent !important;
   background-image: none !important;
 }`);
-      if (resolvedContent !== 'theme') {
-        rules.push(`${surface} {
-${contentTokens(resolvedContent)}
+      rules.push(`${surface} {
+${contentTokens(contentMode)}
 }`);
-        if (resolvedContent === 'light') {
-          rules.push(`${surface} button[class*="newSession"] {
+      if (contentMode === 'light') {
+        rules.push(`${surface} button[class*="newSession"] {
   background-color: rgba(255, 255, 255, 0.10) !important;
   color: #f8fafc !important;
 }`);
-          rules.push(`${surface} button[class*="newSession"]:hover {
+        rules.push(`${surface} button[class*="newSession"]:hover {
   background-color: rgba(255, 255, 255, 0.16) !important;
 }`);
-        } else {
-          rules.push(`${surface} button[class*="newSession"] {
+      } else {
+        rules.push(`${surface} button[class*="newSession"] {
   background-color: rgba(255, 255, 255, 0.55) !important;
   color: #0f172a !important;
 }`);
-          rules.push(`${surface} button[class*="newSession"]:hover {
+        rules.push(`${surface} button[class*="newSession"]:hover {
   background-color: rgba(255, 255, 255, 0.72) !important;
 }`);
-        }
       }
 
       const layers = [];
@@ -1360,7 +1317,7 @@ ${contentTokens(resolvedContent)}
               enabled: true,
               opacity: preset.opacity ?? 1,
               baseColor: preset.baseColor,
-              content: preset.content ?? 'auto',
+              content: preset.content ?? 'light',
               gradient: { ...p.gradient, ...preset.gradient, enabled: true },
               glow: { ...p.glow, ...preset.glow, enabled: true },
               veil: { ...p.veil, ...preset.veil, enabled: true },
@@ -1637,7 +1594,6 @@ ${contentTokens(resolvedContent)}
               label: tr('surface.content'),
               value: p.content,
               options: [
-                ['auto', tr('surface.contentAuto')],
                 ['light', tr('surface.contentLight')],
                 ['dark', tr('surface.contentDark')],
               ],
