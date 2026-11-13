@@ -8,6 +8,12 @@ window.__ModuleLoader__.load({
     const SECTION_ID = 'dsh-panel-theme';
     const STORAGE_KEY = 'dsh-panel-theme.prefs.v1';
     const LEGACY_STORAGE_KEY = 'dsh-sidebar-theme.prefs.v1';
+    const CONTENT_AUTO_MIGRATION_KEY = 'dsh-panel-theme.content-auto.v1';
+    // One-time cleanup for the old user-saved duplicate of the twilight-light preset.
+    const PRESET_CLEANUP_KEY = 'dsh-panel-theme.preset-cleanup.v3';
+    const DUPLICATE_PRESET_NAMES = new Set(['暮光(浅)']);
+    const PRESET_RENAME_KEY = 'dsh-panel-theme.preset-rename.v4';
+    const CUSTOM_PRESET_RENAMES = new Map([['霓虹(浅)', '霓虹']]);
     const BACKGROUND_STYLE_ATTR = 'background';
     const UI_STYLE_ATTR = 'ui';
 
@@ -15,7 +21,7 @@ window.__ModuleLoader__.load({
       enabled: false,
       opacity: 1,
       baseColor: '#0f172a',
-      content: 'light',
+      content: 'auto',
       gradient: {
         enabled: true,
         from: '#2563eb',
@@ -40,39 +46,38 @@ window.__ModuleLoader__.load({
     };
 
     const MAX_CUSTOM_PRESETS = 30;
+    const ACCENT_COLOR = '#0a84ff';
     const BACKUP_FORMAT = 'dsh-panel-theme';
     const BACKUP_VERSION = 1;
     const MAX_BACKUP_BYTES = 2 * 1024 * 1024;
 
     const PRESETS = [
       {
-        id: 'aurora',
-        labelKey: 'preset.aurora',
+        id: 'twilight',
+        labelKey: 'preset.twilight',
+        theme: 'dark',
         baseColor: '#07111f',
-        gradient: { from: '#2563eb', to: '#7c3aed', angle: 135, opacity: 0.52 },
-        glow: { color: '#38bdf8', opacity: 0.38, size: 68, x: 22, y: 16 },
-        veil: { opacity: 0.32 },
+        opacity: 1,
+        content: 'light',
+        gradient: { from: '#232220', to: '#ee9a00', angle: 282, opacity: 1 },
+        glow: { color: '#38bdf8', opacity: 0.69, size: 72, x: 75, y: 80 },
+        veil: { opacity: 0.8 },
       },
       {
-        id: 'dusk',
-        labelKey: 'preset.dusk',
-        baseColor: '#190f20',
-        gradient: { from: '#db2777', to: '#7c3aed', angle: 115, opacity: 0.46 },
-        glow: { color: '#f472b6', opacity: 0.32, size: 58, x: 82, y: 18 },
-        veil: { opacity: 0.34 },
-      },
-      {
-        id: 'forest',
-        labelKey: 'preset.forest',
-        baseColor: '#071a14',
-        gradient: { from: '#059669', to: '#0e7490', angle: 150, opacity: 0.46 },
-        glow: { color: '#34d399', opacity: 0.3, size: 62, x: 20, y: 82 },
-        veil: { opacity: 0.34 },
+        id: 'twilight-light',
+        labelKey: 'preset.twilightLight',
+        theme: 'light',
+        baseColor: '#f7f1e8',
+        opacity: 1,
+        content: 'dark',
+        gradient: { from: '#f0d7bd', to: '#f0a63a', angle: 282, opacity: 0.55 },
+        glow: { color: '#7dd3fc', opacity: 0.3, size: 64, x: 75, y: 80 },
+        veil: { opacity: 0.18 },
       },
     ];
 
     const EN = {
-      nav: 'Sidebar style',
+      nav: 'Sidebar appearance',
       eyebrow: 'Appearance',
       title: 'Sidebar appearance',
       description:
@@ -82,14 +87,17 @@ window.__ModuleLoader__.load({
       'enable.off': 'Off',
       'enable.hint': 'When off, the native sidebar background is used.',
       'presets.label': 'Quick presets',
-      'preset.aurora': 'Aurora',
-      'preset.dusk': 'Dusk',
-      'preset.forest': 'Forest',
+      'presets.modeHint': '☾ presets suit dark themes, ☀ presets suit light themes. When switching themes, choose the preset that matches the current appearance.',
+      'preset.twilight': 'Twilight',
+      'preset.twilightLight': 'Twilight',
       'presets.save': 'Save current',
       'presets.saveTitle': 'Save current style as preset',
       'presets.name': 'Preset name',
       'presets.namePlaceholder': 'e.g. Midnight blue',
       'presets.confirmSave': 'Save preset',
+      'presets.modeLight': 'Light mode',
+      'presets.modeDark': 'Dark mode',
+      'presets.saveMode': 'Save to: ',
       'presets.delete': 'Delete preset',
       'presets.deleteTitle': 'Delete preset?',
       'presets.deleteBody': 'This preset will be permanently removed. This cannot be undone.',
@@ -113,7 +121,7 @@ window.__ModuleLoader__.load({
       'io.tooLarge': 'The file is too large. The maximum size is 2 MB.',
       'related.title': 'Related project',
       'related.hint':
-        'Tabbiy is a separate Chrome extension for vertical tabs and auto-grouping. It is not part of this plugin.',
+        'Tabbiy is a separate Chrome extension for vertical tabs and auto-grouping.',
       'related.link': 'Visit Tabbiy',
       reset: 'Reset',
       'surface.title': 'Surface',
@@ -121,7 +129,7 @@ window.__ModuleLoader__.load({
       'surface.baseColor': 'Base color',
       'surface.opacity': 'Opacity',
       'surface.content': 'Content color',
-      'surface.contentAuto': 'Follow theme',
+      'surface.contentAuto': 'Auto contrast',
       'surface.contentLight': 'Light text',
       'surface.contentDark': 'Dark text',
       'gradient.title': 'Gradient',
@@ -151,7 +159,7 @@ window.__ModuleLoader__.load({
     };
 
     const ZH = {
-      nav: '侧边栏样式',
+      nav: '侧边栏外观',
       eyebrow: '外观',
       title: '侧边栏外观',
       description: '用渐变或光晕装饰左侧边栏。修改会立即生效，并保存在当前浏览器中。',
@@ -160,14 +168,17 @@ window.__ModuleLoader__.load({
       'enable.off': '已关闭',
       'enable.hint': '关闭时使用 Harness 原生的侧边栏背景。',
       'presets.label': '快速预设',
-      'preset.aurora': '极光',
-      'preset.dusk': '暮色',
-      'preset.forest': '森林',
+      'presets.modeHint': '☾ 预设适合深色主题，☀ 预设适合浅色主题；切换深浅色主题时，请选择与当前主题匹配的预设。',
+      'preset.twilight': '暮光',
+      'preset.twilightLight': '暮光',
       'presets.save': '保存当前',
       'presets.saveTitle': '保存当前样式为预设',
       'presets.name': '预设名称',
       'presets.namePlaceholder': '例如：午夜蓝',
       'presets.confirmSave': '保存预设',
+      'presets.modeLight': '浅色模式',
+      'presets.modeDark': '深色模式',
+      'presets.saveMode': '保存到：',
       'presets.delete': '删除预设',
       'presets.deleteTitle': '删除预设？',
       'presets.deleteBody': '该预设将被永久删除，此操作无法撤销。',
@@ -190,7 +201,7 @@ window.__ModuleLoader__.load({
       'io.version': '该备份由更新版本创建，当前版本无法导入。',
       'io.tooLarge': '文件过大，最大支持 2 MB。',
       'related.title': '相关项目',
-      'related.hint': 'Tabbiy 是一个独立的 Chrome 垂直标签页管理与自动分组扩展，不是本插件的功能。',
+      'related.hint': 'Tabbiy 是一个独立的 Chrome 垂直标签页管理与自动分组扩展。',
       'related.link': '访问 Tabbiy',
       reset: '重置',
       'surface.title': '底层',
@@ -198,7 +209,7 @@ window.__ModuleLoader__.load({
       'surface.baseColor': '基础颜色',
       'surface.opacity': '透明度',
       'surface.content': '内容文字',
-      'surface.contentAuto': '跟随主题',
+      'surface.contentAuto': '自动适配',
       'surface.contentLight': '浅色文字',
       'surface.contentDark': '深色文字',
       'gradient.title': '渐变',
@@ -242,7 +253,7 @@ window.__ModuleLoader__.load({
         justify-content: space-between;
         gap: 24px;
         padding: 4px 0 20px;
-        border-bottom: 1px solid var(--dsw-alias-border-l1);
+        border-bottom: 1px solid var(--dsw-alias-border-l2);
       }
       .dst-hero-copy { min-width: 0; }
       .dst-eyebrow {
@@ -274,7 +285,7 @@ window.__ModuleLoader__.load({
         padding-top: 2px;
       }
       .dst-master-label {
-        color: var(--dsw-alias-label-secondary);
+        color: var(--dsw-alias-label-primary);
         font-size: 12px;
         white-space: nowrap;
       }
@@ -298,28 +309,30 @@ window.__ModuleLoader__.load({
         width: 16px;
         height: 16px;
         border-radius: 50%;
-        background: var(--dsw-alias-label-secondary);
-        transition: transform .16s ease, background .16s ease;
+        background: var(--dsw-alias-label-primary);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .28);
+        transition: transform .16s ease, background .16s ease, box-shadow .16s ease;
       }
       .dst-switch[aria-checked="true"] {
-        border-color: transparent;
-        background: var(--dsw-alias-brand-primary);
+        border-color: ${ACCENT_COLOR};
+        background: ${ACCENT_COLOR};
       }
       .dst-switch[aria-checked="true"]::after {
         background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
         transform: translateX(18px);
       }
       .dst-switch:focus-visible,
       .dst-preset:focus-visible,
       .dst-preset-delete:focus-visible,
       .dst-modal-btn:focus-visible {
-        outline: 2px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 55%, transparent);
+        outline: 2px solid color-mix(in srgb, ${ACCENT_COLOR} 70%, transparent);
         outline-offset: 2px;
       }
       .dst-notice {
         margin-top: 14px;
         padding: 9px 12px;
-        border: 1px solid var(--dsw-alias-border-l1);
+        border: 1px solid var(--dsw-alias-border-l2);
         border-radius: 8px;
         background: var(--dsw-alias-bg-layer-1);
         color: var(--dsw-alias-label-primary);
@@ -337,13 +350,19 @@ window.__ModuleLoader__.load({
         color: var(--dsw-alias-label-secondary);
         font-size: 12px;
       }
+      .dst-presets-hint {
+        margin: 0 0 8px;
+        color: var(--dsw-alias-label-secondary);
+        font-size: 12px;
+        line-height: 1.55;
+      }
       .dst-preset {
         display: inline-flex;
         align-items: center;
         gap: 7px;
         height: 30px;
         padding: 0 11px;
-        border: 1px solid var(--dsw-alias-border-l1);
+        border: 1px solid var(--dsw-alias-border-l2);
         border-radius: 999px;
         background: transparent;
         color: var(--dsw-alias-label-secondary);
@@ -369,6 +388,18 @@ window.__ModuleLoader__.load({
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      .dst-preset-mode {
+        flex: 0 0 auto;
+        font-size: 11px;
+        line-height: 1;
+        opacity: .72;
+      }
+      .dst-preset-mode[data-mode="dark"] {
+        color: var(--dsw-alias-state-business-primary);
+      }
+      .dst-preset-mode[data-mode="light"] {
+        color: var(--dsw-alias-state-warn-primary);
       }
       .dst-preset-wrap {
         display: inline-flex;
@@ -396,8 +427,9 @@ window.__ModuleLoader__.load({
       .dst-preset-actions {
         display: flex;
         align-items: center;
+        justify-content: flex-end;
         gap: 4px;
-        margin-left: auto;
+        margin: 0 0 4px;
       }
       .dst-reset {
         margin-left: auto;
@@ -423,7 +455,7 @@ window.__ModuleLoader__.load({
       }
       .dst-io-actions .dst-reset {
         margin-left: 0;
-        border-color: var(--dsw-alias-border-l1);
+        border-color: var(--dsw-alias-border-l2);
       }
       .dst-related-link {
         display: inline-flex;
@@ -431,7 +463,7 @@ window.__ModuleLoader__.load({
         gap: 6px;
         margin-top: 12px;
         padding: 7px 11px;
-        border: 1px solid var(--dsw-alias-border-l1);
+        border: 1px solid var(--dsw-alias-border-l2);
         border-radius: 8px;
         color: var(--dsw-alias-brand-primary);
         font-size: 12px;
@@ -474,7 +506,7 @@ window.__ModuleLoader__.load({
       .dst-modal {
         width: min(420px, 100%);
         padding: 20px;
-        border: 1px solid var(--dsw-alias-border-l1);
+        border: 1px solid var(--dsw-alias-border-l2);
         border-radius: 14px;
         background: var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-layer-1));
         color: var(--dsw-alias-label-primary);
@@ -492,6 +524,12 @@ window.__ModuleLoader__.load({
         font-size: 12px;
         line-height: 1.6;
       }
+      .dst-modal-mode {
+        margin: 4px 0 0;
+        color: var(--dsw-alias-label-secondary);
+        font-size: 12px;
+        line-height: 1.5;
+      }
       .dst-modal-name {
         margin-top: 8px;
         font-size: 13px;
@@ -504,7 +542,7 @@ window.__ModuleLoader__.load({
         box-sizing: border-box;
         margin-top: 12px;
         padding: 0 10px;
-        border: 1px solid var(--dsw-alias-border-l1);
+        border: 1px solid var(--dsw-alias-border-l2);
         border-radius: 8px;
         outline: none;
         background: var(--dsw-alias-bg-layer-1);
@@ -524,7 +562,7 @@ window.__ModuleLoader__.load({
       .dst-modal-btn {
         height: 32px;
         padding: 0 13px;
-        border: 1px solid var(--dsw-alias-border-l1);
+        border: 1px solid var(--dsw-alias-border-l2);
         border-radius: 8px;
         background: transparent;
         color: var(--dsw-alias-label-primary);
@@ -553,7 +591,7 @@ window.__ModuleLoader__.load({
       .dst-modal-btn-danger:hover { background: var(--dsw-alias-state-error-primary); }
       .dst-card {
         padding: 20px 0;
-        border-bottom: 1px solid var(--dsw-alias-border-l1);
+        border-bottom: 1px solid var(--dsw-alias-border-l2);
       }
       .dst-card:last-of-type { border-bottom: 0; }
       .dst-card-head {
@@ -603,7 +641,7 @@ window.__ModuleLoader__.load({
         height: 34px;
         box-sizing: border-box;
         padding: 0 10px;
-        border: 1px solid var(--dsw-alias-border-l1);
+        border: 1px solid var(--dsw-alias-border-l2);
         border-radius: 8px;
         background: var(--dsw-alias-bg-layer-1);
         color: var(--dsw-alias-label-primary);
@@ -612,14 +650,14 @@ window.__ModuleLoader__.load({
         outline: none;
       }
       .dst-select:focus {
-        border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 55%, var(--dsw-alias-border-l1));
+        border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 55%, var(--dsw-alias-border-l2));
         box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, transparent);
       }
       .dst-range {
         width: 100%;
         height: 24px;
         margin: 0;
-        accent-color: var(--dsw-alias-brand-primary);
+        accent-color: ${ACCENT_COLOR};
         cursor: pointer;
       }
       .dst-color-row {
@@ -633,7 +671,7 @@ window.__ModuleLoader__.load({
         flex: none;
         box-sizing: border-box;
         padding: 3px;
-        border: 1px solid var(--dsw-alias-border-l1);
+        border: 1px solid var(--dsw-alias-border-l2);
         border-radius: 8px;
         background: var(--dsw-alias-bg-layer-1);
         cursor: pointer;
@@ -729,6 +767,24 @@ window.__ModuleLoader__.load({
       };
     }
 
+    function currentThemeMode() {
+      try {
+        if (typeof document === 'undefined') return 'light';
+        const body = document.body;
+        if (body && typeof body.matches === 'function' && body.matches('[data-ds-dark-theme]')) {
+          return 'dark';
+        }
+        const root = document.documentElement;
+        if (root && typeof root.matches === 'function' && root.matches('[data-ds-dark-theme]')) {
+          return 'dark';
+        }
+        if (root && root.dataset && root.dataset.dsThemeSource === 'dark') return 'dark';
+      } catch (error) {
+        // Theme detection is best-effort; fall back to light.
+      }
+      return 'light';
+    }
+
     function sanitizeCustomPreset(input, index, usedIds) {
       const preset = isObject(input) ? input : {};
       const name =
@@ -745,6 +801,10 @@ window.__ModuleLoader__.load({
       return {
         id,
         name,
+        theme:
+          preset.theme === 'dark' || preset.theme === 'light'
+            ? preset.theme
+            : undefined,
         opacity: numberOr(preset.opacity, DEFAULTS.opacity, 0, 1),
         baseColor: hexColor(preset.baseColor, DEFAULTS.baseColor),
         content: enumOr(preset.content, ['auto', 'light', 'dark'], DEFAULTS.content),
@@ -830,6 +890,16 @@ window.__ModuleLoader__.load({
     }
 
     function loadPrefs() {
+      let migrationPending = false;
+      let presetCleanupPending = false;
+      let presetRenamePending = false;
+      try {
+        migrationPending = !window.localStorage.getItem(CONTENT_AUTO_MIGRATION_KEY);
+        presetCleanupPending = !window.localStorage.getItem(PRESET_CLEANUP_KEY);
+        presetRenamePending = !window.localStorage.getItem(PRESET_RENAME_KEY);
+      } catch (error) {
+        // Storage may be unavailable in privacy modes; keep using the defaults.
+      }
       try {
         let raw = window.localStorage.getItem(STORAGE_KEY);
         let legacy = false;
@@ -841,15 +911,86 @@ window.__ModuleLoader__.load({
           const stored = JSON.parse(raw);
           const parsed = sanitize(stored);
           const hadImage = isObject(stored) && Object.prototype.hasOwnProperty.call(stored, 'image');
-          if (legacy || hadImage) {
+          let cleanedPresets = false;
+          if (presetCleanupPending) {
+            const beforeCustom = parsed.customPresets.length;
+            parsed.customPresets = parsed.customPresets.filter(
+              (preset) => !DUPLICATE_PRESET_NAMES.has(preset.name),
+            );
+            const beforeHidden = parsed.hiddenPresets.length;
+            parsed.hiddenPresets = [];
+            cleanedPresets =
+              parsed.customPresets.length !== beforeCustom || beforeHidden > 0;
+          }
+          let presetCleanupPersisted = !cleanedPresets;
+          let renamedPresets = false;
+          if (presetRenamePending) {
+            parsed.customPresets = parsed.customPresets.map((preset) => {
+              const nextName = CUSTOM_PRESET_RENAMES.get(preset.name);
+              if (!nextName) return preset;
+              renamedPresets = true;
+              return { ...preset, name: nextName };
+            });
+          }
+          let presetRenamePersisted = !renamedPresets;
+          let migratedContent = false;
+          if (migrationPending && parsed.content === 'light' && autoContentMode(parsed) !== 'light') {
+            parsed.content = 'auto';
+            migratedContent = true;
+          }
+          if (migrationPending) {
+            try {
+              window.localStorage.setItem(CONTENT_AUTO_MIGRATION_KEY, '1');
+            } catch (error) {
+              // A failed marker only means the migration can run again next time.
+            }
+          }
+          if (legacy || hadImage || migratedContent || cleanedPresets || renamedPresets) {
             try {
               window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
               if (legacy) window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+              presetCleanupPersisted = true;
+              presetRenamePersisted = true;
             } catch (error) {
               console.warn('[dsh-panel-theme] could not migrate preferences', error);
             }
           }
+          if (presetCleanupPending && presetCleanupPersisted) {
+            try {
+              window.localStorage.setItem(PRESET_CLEANUP_KEY, '1');
+            } catch (error) {
+              // A failed marker only means the cleanup can run again next time.
+            }
+          }
+          if (presetRenamePending && presetRenamePersisted) {
+            try {
+              window.localStorage.setItem(PRESET_RENAME_KEY, '1');
+            } catch (error) {
+              // A failed marker only means the rename can run again next time.
+            }
+          }
           return parsed;
+        }
+        if (migrationPending) {
+          try {
+            window.localStorage.setItem(CONTENT_AUTO_MIGRATION_KEY, '1');
+          } catch (error) {
+            // Ignore unavailable storage; defaults already use automatic contrast.
+          }
+        }
+        if (presetCleanupPending) {
+          try {
+            window.localStorage.setItem(PRESET_CLEANUP_KEY, '1');
+          } catch (error) {
+            // Ignore unavailable storage; there are no presets to clean up.
+          }
+        }
+        if (presetRenamePending) {
+          try {
+            window.localStorage.setItem(PRESET_RENAME_KEY, '1');
+          } catch (error) {
+            // Ignore unavailable storage; there are no preset names to rename.
+          }
         }
       } catch (error) {
         console.warn('[dsh-panel-theme] could not read preferences', error);
@@ -915,6 +1056,23 @@ window.__ModuleLoader__.load({
       return `rgba(${color.r}, ${color.g}, ${color.b}, ${clamp(alpha, 0, 1).toFixed(3)})`;
     }
 
+    function relativeLuminance(hex) {
+      const color = rgb(hex);
+      const channel = (value) => {
+        const v = value / 255;
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+    }
+
+    function autoContentMode(input) {
+      if (input.opacity < 0.6) return 'theme';
+      const luminance = relativeLuminance(input.baseColor);
+      const contrastWithLight = 1.05 / (luminance + 0.05);
+      const contrastWithDark = (luminance + 0.05) / 0.05;
+      return contrastWithDark >= contrastWithLight ? 'dark' : 'light';
+    }
+
     function contentTokens(theme) {
       if (theme === 'light') {
         return `  --dsw-alias-label-primary: #f8fafc;
@@ -958,6 +1116,7 @@ window.__ModuleLoader__.load({
 
       const surface = 'div:has(> [data-slot="sidebar"])';
       const opacity = p.opacity;
+      const resolvedContent = p.content === 'auto' ? autoContentMode(p) : p.content;
       const rules = [];
 
       rules.push(`${surface} {
@@ -970,11 +1129,11 @@ window.__ModuleLoader__.load({
   background-color: transparent !important;
   background-image: none !important;
 }`);
-      if (p.content !== 'auto') {
+      if (resolvedContent !== 'theme') {
         rules.push(`${surface} {
-${contentTokens(p.content)}
+${contentTokens(resolvedContent)}
 }`);
-        if (p.content === 'light') {
+        if (resolvedContent === 'light') {
           rules.push(`${surface} button[class*="newSession"] {
   background-color: rgba(255, 255, 255, 0.10) !important;
   color: #f8fafc !important;
@@ -1154,6 +1313,8 @@ ${contentTokens(p.content)}
     function SidebarThemeSection({ t }) {
       const tr = typeof t === 'function' ? t : (key) => key;
       const p = usePrefs();
+      const activeMode = currentThemeMode();
+      const modeLabel = (mode) => tr(mode === 'dark' ? 'presets.modeDark' : 'presets.modeLight');
       const [notice, setNotice] = React.useState('');
       const [saveOpen, setSaveOpen] = React.useState(false);
       const [saveName, setSaveName] = React.useState('');
@@ -1197,9 +1358,9 @@ ${contentTokens(p.content)}
         const patch = builtIn
           ? {
               enabled: true,
-              opacity: 1,
+              opacity: preset.opacity ?? 1,
               baseColor: preset.baseColor,
-              content: 'light',
+              content: preset.content ?? 'auto',
               gradient: { ...p.gradient, ...preset.gradient, enabled: true },
               glow: { ...p.glow, ...preset.glow, enabled: true },
               veil: { ...p.veil, ...preset.veil, enabled: true },
@@ -1244,6 +1405,7 @@ ${contentTokens(p.content)}
             {
               id: `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
               name,
+              theme: currentThemeMode(),
               opacity: p.opacity,
               baseColor: p.baseColor,
               content: p.content,
@@ -1406,6 +1568,19 @@ ${contentTokens(p.content)}
                   },
                 }),
                 h('span', { className: 'dst-preset-name' }, presetName(preset, builtIn)),
+                preset.theme
+                  ? h(
+                      'span',
+                      {
+                        className: 'dst-preset-mode',
+                        'data-mode': preset.theme,
+                        role: 'img',
+                        title: modeLabel(preset.theme),
+                        'aria-label': modeLabel(preset.theme),
+                      },
+                      preset.theme === 'dark' ? '☾' : '☀',
+                    )
+                  : null,
               ),
               h(
                 'button',
@@ -1420,22 +1595,23 @@ ${contentTokens(p.content)}
               ),
             ),
           ),
+        ),
+        h('p', { className: 'dst-presets-hint' }, tr('presets.modeHint')),
+        h(
+          'div',
+          { className: 'dst-preset-actions' },
           h(
-            'div',
-            { className: 'dst-preset-actions' },
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'dst-reset',
-                title: p.customPresets.length >= MAX_CUSTOM_PRESETS ? tr('presets.limit') : tr('presets.save'),
-                onClick: openSave,
-                disabled: p.customPresets.length >= MAX_CUSTOM_PRESETS,
-              },
-              tr('presets.save'),
-            ),
-            h('button', { type: 'button', className: 'dst-reset', onClick: reset }, tr('reset')),
+            'button',
+            {
+              type: 'button',
+              className: 'dst-reset',
+              title: p.customPresets.length >= MAX_CUSTOM_PRESETS ? tr('presets.limit') : tr('presets.save'),
+              onClick: openSave,
+              disabled: p.customPresets.length >= MAX_CUSTOM_PRESETS,
+            },
+            tr('presets.save'),
           ),
+          h('button', { type: 'button', className: 'dst-reset', onClick: reset }, tr('reset')),
         ),
         h(
           Card,
@@ -1654,6 +1830,11 @@ ${contentTokens(p.content)}
                   'h3',
                   { className: 'dst-modal-title', id: 'dsh-panel-save-title' },
                   tr('presets.saveTitle'),
+                ),
+                h(
+                  'p',
+                  { className: 'dst-modal-mode' },
+                  `${tr('presets.saveMode')}${modeLabel(activeMode)}`,
                 ),
                 h(
                   'label',
