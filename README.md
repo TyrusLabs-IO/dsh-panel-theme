@@ -28,7 +28,7 @@
 需要支持 Web UI 插件的 DeepSeek Harness。先克隆仓库：
 
 ```sh
-git clone https://github.com/TyrusLockwood/dsh-panel-theme.git
+git clone https://github.com/TyrusLabs-IO/dsh-panel-theme.git
 cd dsh-panel-theme
 ```
 
@@ -84,8 +84,8 @@ cordis.patch.yml    # 插件安装行
 index.js            # Host 侧占位
 client.js           # 设置页面、样式注入与浏览器存储
 locale/             # 插件目录与设置页文案（en / zh）
-icon.svg            # 插件矢量图标
-icon.png            # 市场卡片用 512×512 位图
+icon.png            # 插件与市场卡片图标（512×512）
+logo.psd             # 图标源文件
 marketplace/        # DSH Market 条目草稿
 MARKETPLACE.md      # 上架检查清单
 LICENSE             # MIT

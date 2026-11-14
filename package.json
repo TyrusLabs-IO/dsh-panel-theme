@@ -5,14 +5,14 @@
   "type": "module",
   "description": "Configurable sidebar background theme for DeepSeek Harness: gradient, glow, opacity, presets and JSON backup.",
   "license": "MIT",
-  "author": "TyrusLockwood",
+  "author": "TyrusLabs-IO",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TyrusLockwood/dsh-panel-theme.git"
+    "url": "git+https://github.com/TyrusLabs-IO/dsh-panel-theme.git"
   },
-  "homepage": "https://github.com/TyrusLockwood/dsh-panel-theme#readme",
+  "homepage": "https://github.com/TyrusLabs-IO/dsh-panel-theme#readme",
   "bugs": {
-    "url": "https://github.com/TyrusLockwood/dsh-panel-theme/issues"
+    "url": "https://github.com/TyrusLabs-IO/dsh-panel-theme/issues"
   },
   "keywords": [
     "dsh-plugin",
@@ -25,14 +25,13 @@
     ".": "./index.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./icon": "./icon.png"
   },
   "files": [
     "index.js",
     "client.js",
     "cordis.patch.yml",
     "locale",
-    "icon.svg",
     "icon.png",
     "LICENSE",
     "README.md"

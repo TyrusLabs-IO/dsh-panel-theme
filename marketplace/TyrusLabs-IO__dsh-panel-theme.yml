@@ -1,9 +1,9 @@
-# Copy this file to awesome-dsh-plugin/data/plugins/TyrusLockwood__dsh-panel-theme.yml
+# Copy this file to awesome-dsh-plugin/data/plugins/TyrusLabs-IO__dsh-panel-theme.yml
 # in a pull request. Do not edit the generated READMEs by hand.
-url: https://github.com/TyrusLockwood/dsh-panel-theme
-name: TyrusLockwood/dsh-panel-theme
+url: https://github.com/TyrusLabs-IO/dsh-panel-theme
+name: TyrusLabs-IO/dsh-panel-theme
 category: theme
 description:
   en: 'Configurable sidebar background theme for DeepSeek Harness: base color and opacity, gradient, glow, readability veil, built-in and saved presets, and JSON backup/restore. Settings stay in the browser.'
   zh: 'DeepSeek Harness 侧边栏背景样式插件：可调基础色与不透明度、渐变、光晕、可读性蒙层，支持内置/自定义预设与 JSON 备份恢复；设置保存在浏览器本地。'
-icon: https://raw.githubusercontent.com/TyrusLockwood/dsh-panel-theme/main/icon.png
+icon: https://raw.githubusercontent.com/TyrusLabs-IO/dsh-panel-theme/main/icon.png
