@@ -18,6 +18,7 @@ window.__ModuleLoader__.load({
 
     const DEFAULTS = {
       enabled: false,
+      configured: false,
       opacity: 1,
       baseColor: '#0f172a',
       content: 'light',
@@ -41,7 +42,6 @@ window.__ModuleLoader__.load({
         opacity: 0.32,
       },
       customPresets: [],
-      hiddenPresets: [],
     };
 
     const MAX_CUSTOM_PRESETS = 30;
@@ -75,6 +75,30 @@ window.__ModuleLoader__.load({
       },
     ];
 
+    // The four theme presets (twilight/neon, dark/light) are fixed. Some were
+    // originally saved as custom presets, so lock them by name as well.
+    const LOCKED_THEME_PRESET_NAMES = new Set([
+      '暮光',
+      '暮光(浅)',
+      'twilight',
+      'twilight (light)',
+      '霓虹',
+      '霓虹(浅)',
+      'neon',
+      'neon (light)',
+    ]);
+
+    function isLockedPreset(preset, builtIn) {
+      return (
+        builtIn ||
+        LOCKED_THEME_PRESET_NAMES.has(
+          String(preset.name || '')
+            .trim()
+            .toLowerCase(),
+        )
+      );
+    }
+
     const EN = {
       nav: 'Sidebar appearance',
       eyebrow: 'Appearance',
@@ -100,7 +124,6 @@ window.__ModuleLoader__.load({
       'presets.delete': 'Delete preset',
       'presets.deleteTitle': 'Delete preset?',
       'presets.deleteBody': 'This preset will be permanently removed. This cannot be undone.',
-      'presets.deleteBuiltInBody': 'This built-in preset will be removed from quick presets. Reset restores it.',
       'presets.deleteConfirm': 'Delete',
       'presets.cancel': 'Cancel',
       'presets.defaultName': 'My preset',
@@ -180,7 +203,6 @@ window.__ModuleLoader__.load({
       'presets.delete': '删除预设',
       'presets.deleteTitle': '删除预设？',
       'presets.deleteBody': '该预设将被永久删除，此操作无法撤销。',
-      'presets.deleteBuiltInBody': '该内置预设将从快速预设中移除，之后可通过「重置」恢复。',
       'presets.deleteConfirm': '删除',
       'presets.cancel': '取消',
       'presets.defaultName': '我的预设',
@@ -236,6 +258,13 @@ window.__ModuleLoader__.load({
     };
 
     const UI_CSS = `
+      body[data-dsh-panel-theme-preview] div[role="presentation"]:has(> [data-shortcut-modal="settings"]) > [aria-hidden="true"] {
+        clip-path: inset(0 0 0 var(--dsh-panel-theme-preview-inset, 0px));
+      }
+      body[data-dsh-panel-theme-preview] div:has(> [data-slot="sidebar"]) {
+        outline: 2px dashed rgba(74, 222, 128, 0.4);
+        outline-offset: -2px;
+      }
       .dst-page {
         width: 100%;
         max-width: 760px;
@@ -577,13 +606,13 @@ window.__ModuleLoader__.load({
       .dst-modal-btn-primary {
         border-color: transparent;
         background: var(--dsw-alias-brand-primary);
-        color: #fff;
+        color: var(--dsw-alias-label-primary-inverted);
       }
       .dst-modal-btn-primary:hover { background: var(--dsw-alias-brand-primary); }
       .dst-modal-btn-danger {
         border-color: transparent;
         background: var(--dsw-alias-state-error-primary);
-        color: #fff;
+        color: var(--dsw-alias-label-primary-inverted);
       }
       .dst-modal-btn-danger:hover { background: var(--dsw-alias-state-error-primary); }
       .dst-card {
@@ -822,15 +851,33 @@ window.__ModuleLoader__.load({
       return presets;
     }
 
-    function sanitizeHiddenPresets(value) {
-      if (!Array.isArray(value)) return [];
-      const valid = new Set(PRESETS.map((preset) => preset.id));
-      return Array.from(new Set(value.filter((id) => typeof id === 'string' && valid.has(id))));
+    function appearanceIsDefault(p) {
+      const gradient = p.gradient;
+      const glow = p.glow;
+      const veil = p.veil;
+      return (
+        p.opacity === DEFAULTS.opacity &&
+        p.baseColor === DEFAULTS.baseColor &&
+        p.content === DEFAULTS.content &&
+        gradient.enabled === DEFAULTS.gradient.enabled &&
+        gradient.from === DEFAULTS.gradient.from &&
+        gradient.to === DEFAULTS.gradient.to &&
+        gradient.angle === DEFAULTS.gradient.angle &&
+        gradient.opacity === DEFAULTS.gradient.opacity &&
+        glow.enabled === DEFAULTS.glow.enabled &&
+        glow.color === DEFAULTS.glow.color &&
+        glow.opacity === DEFAULTS.glow.opacity &&
+        glow.size === DEFAULTS.glow.size &&
+        glow.x === DEFAULTS.glow.x &&
+        glow.y === DEFAULTS.glow.y &&
+        veil.enabled === DEFAULTS.veil.enabled &&
+        veil.opacity === DEFAULTS.veil.opacity
+      );
     }
 
     function sanitize(input) {
       const root = isObject(input) ? input : {};
-      return {
+      const normalized = {
         enabled: booleanOr(root.enabled, DEFAULTS.enabled),
         opacity: numberOr(root.opacity, DEFAULTS.opacity, 0, 1),
         baseColor: hexColor(root.baseColor, DEFAULTS.baseColor),
@@ -839,8 +886,12 @@ window.__ModuleLoader__.load({
         glow: sanitizeGlow(root.glow),
         veil: sanitizeVeil(root.veil),
         customPresets: sanitizeCustomPresets(root.customPresets),
-        hiddenPresets: sanitizeHiddenPresets(root.hiddenPresets),
       };
+      normalized.configured =
+        typeof root.configured === 'boolean'
+          ? root.configured
+          : !appearanceIsDefault(normalized);
+      return normalized;
     }
 
     function serializeBackup(preferences) {
@@ -912,10 +963,7 @@ window.__ModuleLoader__.load({
             parsed.customPresets = parsed.customPresets.filter(
               (preset) => !DUPLICATE_PRESET_NAMES.has(preset.name),
             );
-            const beforeHidden = parsed.hiddenPresets.length;
-            parsed.hiddenPresets = [];
-            cleanedPresets =
-              parsed.customPresets.length !== beforeCustom || beforeHidden > 0;
+            cleanedPresets = parsed.customPresets.length !== beforeCustom;
           }
           let presetCleanupPersisted = !cleanedPresets;
           let renamedPresets = false;
@@ -998,24 +1046,58 @@ window.__ModuleLoader__.load({
       };
     }
 
+    let persistTimer = 0;
+    let persistErrorListener = null;
+
     function persistPrefs(next) {
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return true;
       } catch (error) {
         console.warn('[dsh-panel-theme] could not save preferences', error);
+        if (persistErrorListener) {
+          try {
+            persistErrorListener();
+          } catch (listenerError) {
+            console.error('[dsh-panel-theme] persistence error listener failed', listenerError);
+          }
+        }
         return false;
       }
     }
 
-    function replacePrefs(next) {
-      prefs = sanitize(next);
-      notifyPrefs();
+    function persistNow() {
+      if (persistTimer) {
+        window.clearTimeout(persistTimer);
+        persistTimer = 0;
+      }
       return persistPrefs(prefs);
     }
 
-    function setPrefs(patch) {
-      return replacePrefs(merge(prefs, patch));
+    function schedulePrefsPersist() {
+      if (persistTimer) return true;
+      persistTimer = window.setTimeout(() => {
+        persistTimer = 0;
+        persistPrefs(prefs);
+      }, 160);
+      return true;
+    }
+
+    function flushPrefsPersist() {
+      if (!persistTimer) return true;
+      window.clearTimeout(persistTimer);
+      persistTimer = 0;
+      return persistPrefs(prefs);
+    }
+
+    function replacePrefs(next, options = {}) {
+      prefs = sanitize(next);
+      notifyPrefs();
+      return options.live ? schedulePrefsPersist() : persistNow();
+    }
+
+    function setPrefs(patch, options = {}) {
+      return replacePrefs(merge(prefs, patch), options);
     }
 
     function rgb(hex) {
@@ -1069,8 +1151,7 @@ window.__ModuleLoader__.load({
   --dsw-alias-state-warn-primary: #b45309;`;
     }
 
-    function buildCss(input) {
-      const p = sanitize(input);
+    function buildCss(p) {
       if (!p.enabled) return '';
 
       const surface = 'div:has(> [data-slot="sidebar"])';
@@ -1191,6 +1272,8 @@ ${contentTokens(contentMode)}
           step,
           value,
           onChange: (event) => onChange(Number(event.target.value)),
+          onPointerUp: flushPrefsPersist,
+          onBlur: flushPrefsPersist,
         }),
       );
     }
@@ -1207,6 +1290,8 @@ ${contentTokens(contentMode)}
             className: 'dst-color',
             value,
             onChange: (event) => onChange(event.target.value),
+            onPointerUp: flushPrefsPersist,
+            onBlur: flushPrefsPersist,
           }),
           h('span', { className: 'dst-hex' }, value.toUpperCase()),
         ),
@@ -1288,6 +1373,36 @@ ${contentTokens(contentMode)}
       );
 
       React.useEffect(() => {
+        if (typeof document === 'undefined' || !document.body || !p.enabled) {
+          return undefined;
+        }
+        const body = document.body;
+        let observer = null;
+
+        const applyPreviewInset = () => {
+          const column = document.querySelector('div:has(> [data-slot="sidebar"])');
+          const width = column ? Math.max(0, Math.round(column.getBoundingClientRect().width)) : 0;
+          body.setAttribute('data-dsh-panel-theme-preview', '');
+          body.style.setProperty('--dsh-panel-theme-preview-inset', `${width}px`);
+        };
+
+        applyPreviewInset();
+        window.addEventListener('resize', applyPreviewInset);
+        if (typeof ResizeObserver === 'function') {
+          observer = new ResizeObserver(applyPreviewInset);
+          const column = document.querySelector('div:has(> [data-slot="sidebar"])');
+          if (column) observer.observe(column);
+        }
+
+        return () => {
+          window.removeEventListener('resize', applyPreviewInset);
+          if (observer) observer.disconnect();
+          body.removeAttribute('data-dsh-panel-theme-preview');
+          body.style.removeProperty('--dsh-panel-theme-preview-inset');
+        };
+      }, [p.enabled]);
+
+      React.useEffect(() => {
         if (!saveOpen && !deleteTarget && !importTarget) return undefined;
         const onKeyDown = (event) => {
           if (event.key === 'Escape') {
@@ -1306,8 +1421,20 @@ ${contentTokens(contentMode)}
         timer.current = window.setTimeout(() => setNotice(''), 4500);
       };
 
-      const edit = (patch) => {
-        const saved = setPrefs(patch);
+      React.useEffect(() => {
+        const onPersistError = () => flash(tr('notice.quota'));
+        persistErrorListener = onPersistError;
+        return () => {
+          if (persistErrorListener === onPersistError) persistErrorListener = null;
+        };
+      }, [tr]);
+
+      const edit = (patch, live = false) => {
+        const touchesAppearance = Object.keys(patch).some(
+          (key) => key !== 'enabled' && key !== 'configured',
+        );
+        const nextPatch = touchesAppearance ? { ...patch, configured: true } : patch;
+        const saved = setPrefs(nextPatch, { live });
         if (!saved) flash(tr('notice.quota'));
       };
 
@@ -1331,6 +1458,7 @@ ${contentTokens(contentMode)}
               glow: { ...preset.glow },
               veil: { ...preset.veil },
             };
+        patch.configured = true;
         const saved = replacePrefs(merge(p, patch));
         if (!saved) flash(tr('notice.quota'));
       };
@@ -1382,13 +1510,13 @@ ${contentTokens(contentMode)}
       };
 
       const confirmDelete = () => {
-        if (!deleteTarget) return;
-        const { preset, builtIn } = deleteTarget;
-        const saved = setPrefs(
-          builtIn
-            ? { hiddenPresets: Array.from(new Set([...p.hiddenPresets, preset.id])) }
-            : { customPresets: p.customPresets.filter((item) => item.id !== preset.id) },
-        );
+        if (!deleteTarget || isLockedPreset(deleteTarget.preset, false)) {
+          setDeleteTarget(null);
+          return;
+        }
+        const saved = setPrefs({
+          customPresets: p.customPresets.filter((item) => item.id !== deleteTarget.preset.id),
+        });
         setDeleteTarget(null);
         flash(saved ? tr('notice.presetDeleted') : tr('notice.quota'));
       };
@@ -1397,7 +1525,6 @@ ${contentTokens(contentMode)}
         const saved = replacePrefs({
           ...DEFAULTS,
           customPresets: p.customPresets,
-          hiddenPresets: [],
         });
         flash(saved ? tr('notice.reset') : tr('notice.quota'));
       };
@@ -1457,22 +1584,17 @@ ${contentTokens(contentMode)}
 
       const confirmImport = () => {
         if (!importTarget) return;
-        const saved = replacePrefs(importTarget.preferences);
+        const saved = replacePrefs({ ...importTarget.preferences, configured: true });
         setImportTarget(null);
         flash(saved ? tr('io.imported') : tr('notice.quota'));
       };
 
       const presetItems = [
-        ...PRESETS.filter((preset) => !p.hiddenPresets.includes(preset.id)).map((preset) => ({
-          preset,
-          builtIn: true,
-        })),
+        ...PRESETS.map((preset) => ({ preset, builtIn: true })),
         ...p.customPresets.map((preset) => ({ preset, builtIn: false })),
       ];
       const presetName = (preset, builtIn) => (builtIn ? tr(preset.labelKey) : preset.name);
-      const deletingName = deleteTarget
-        ? presetName(deleteTarget.preset, deleteTarget.builtIn)
-        : '';
+      const deletingName = deleteTarget ? presetName(deleteTarget.preset, false) : '';
 
       return h(
         'div',
@@ -1493,7 +1615,19 @@ ${contentTokens(contentMode)}
             h('span', { className: 'dst-master-label' }, p.enabled ? tr('enable.on') : tr('enable.off')),
             h(Toggle, {
               checked: p.enabled,
-              onChange: (enabled) => edit({ enabled }),
+              onChange: (enabled) => {
+                if (!enabled) {
+                  edit({ enabled: false });
+                  return;
+                }
+                if (p.configured) {
+                  edit({ enabled: true });
+                  return;
+                }
+                const preset =
+                  PRESETS.find((item) => item.theme === currentThemeMode()) || PRESETS[0];
+                applyPreset(preset, true);
+              },
               label: tr('enable.label'),
             }),
           ),
@@ -1539,17 +1673,19 @@ ${contentTokens(contentMode)}
                     )
                   : null,
               ),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'dst-preset-delete',
-                  title: tr('presets.delete'),
-                  'aria-label': `${tr('presets.delete')}: ${presetName(preset, builtIn)}`,
-                  onClick: () => setDeleteTarget({ preset, builtIn }),
-                },
-                '×',
-              ),
+              isLockedPreset(preset, builtIn)
+                ? null
+                : h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'dst-preset-delete',
+                      title: tr('presets.delete'),
+                      'aria-label': `${tr('presets.delete')}: ${presetName(preset, false)}`,
+                      onClick: () => setDeleteTarget({ preset }),
+                    },
+                    '×',
+                  ),
             ),
           ),
         ),
@@ -1579,7 +1715,7 @@ ${contentTokens(contentMode)}
             h(ColorField, {
               label: tr('surface.baseColor'),
               value: p.baseColor,
-              onChange: (baseColor) => edit({ baseColor }),
+              onChange: (baseColor) => edit({ baseColor }, true),
             }),
             h(Slider, {
               label: tr('surface.opacity'),
@@ -1588,7 +1724,7 @@ ${contentTokens(contentMode)}
               max: 1,
               step: 0.01,
               display: `${Math.round(p.opacity * 100)}%`,
-              onChange: (opacity) => edit({ opacity }),
+              onChange: (opacity) => edit({ opacity }, true),
             }),
             h(Select, {
               label: tr('surface.content'),
@@ -1618,12 +1754,12 @@ ${contentTokens(contentMode)}
             h(ColorField, {
               label: tr('gradient.from'),
               value: p.gradient.from,
-              onChange: (from) => edit({ gradient: { from } }),
+              onChange: (from) => edit({ gradient: { from } }, true),
             }),
             h(ColorField, {
               label: tr('gradient.to'),
               value: p.gradient.to,
-              onChange: (to) => edit({ gradient: { to } }),
+              onChange: (to) => edit({ gradient: { to } }, true),
             }),
             h(Slider, {
               label: tr('gradient.angle'),
@@ -1631,7 +1767,7 @@ ${contentTokens(contentMode)}
               min: 0,
               max: 360,
               display: `${Math.round(p.gradient.angle)}°`,
-              onChange: (angle) => edit({ gradient: { angle } }),
+              onChange: (angle) => edit({ gradient: { angle } }, true),
             }),
             h(Slider, {
               label: tr('gradient.opacity'),
@@ -1640,7 +1776,7 @@ ${contentTokens(contentMode)}
               max: 1,
               step: 0.01,
               display: `${Math.round(p.gradient.opacity * 100)}%`,
-              onChange: (opacity) => edit({ gradient: { opacity } }),
+              onChange: (opacity) => edit({ gradient: { opacity } }, true),
             }),
           ),
         ),
@@ -1661,7 +1797,7 @@ ${contentTokens(contentMode)}
             h(ColorField, {
               label: tr('glow.color'),
               value: p.glow.color,
-              onChange: (color) => edit({ glow: { color } }),
+              onChange: (color) => edit({ glow: { color } }, true),
             }),
             h(Slider, {
               label: tr('glow.opacity'),
@@ -1670,7 +1806,7 @@ ${contentTokens(contentMode)}
               max: 1,
               step: 0.01,
               display: `${Math.round(p.glow.opacity * 100)}%`,
-              onChange: (opacity) => edit({ glow: { opacity } }),
+              onChange: (opacity) => edit({ glow: { opacity } }, true),
             }),
             h(Slider, {
               label: tr('glow.size'),
@@ -1678,7 +1814,7 @@ ${contentTokens(contentMode)}
               min: 10,
               max: 100,
               display: `${Math.round(p.glow.size)}%`,
-              onChange: (size) => edit({ glow: { size } }),
+              onChange: (size) => edit({ glow: { size } }, true),
             }),
             h(Slider, {
               label: tr('glow.x'),
@@ -1686,7 +1822,7 @@ ${contentTokens(contentMode)}
               min: 0,
               max: 100,
               display: `${Math.round(p.glow.x)}%`,
-              onChange: (x) => edit({ glow: { x } }),
+              onChange: (x) => edit({ glow: { x } }, true),
             }),
             h(Slider, {
               label: tr('glow.y'),
@@ -1694,7 +1830,7 @@ ${contentTokens(contentMode)}
               min: 0,
               max: 100,
               display: `${Math.round(p.glow.y)}%`,
-              onChange: (y) => edit({ glow: { y } }),
+              onChange: (y) => edit({ glow: { y } }, true),
             }),
           ),
         ),
@@ -1719,7 +1855,7 @@ ${contentTokens(contentMode)}
               max: 1,
               step: 0.01,
               display: `${Math.round(p.veil.opacity * 100)}%`,
-              onChange: (opacity) => edit({ veil: { opacity } }),
+              onChange: (opacity) => edit({ veil: { opacity } }, true),
             }),
           ),
         ),
@@ -1863,7 +1999,7 @@ ${contentTokens(contentMode)}
                 h(
                   'p',
                   { className: 'dst-modal-body' },
-                  tr(deleteTarget.builtIn ? 'presets.deleteBuiltInBody' : 'presets.deleteBody'),
+                  tr('presets.deleteBody'),
                 ),
                 h('div', { className: 'dst-modal-name' }, deletingName),
                 h(
@@ -1993,20 +2129,52 @@ ${contentTokens(contentMode)}
         const backgroundTag = styleTag(BACKGROUND_STYLE_ATTR);
         const uiTag = styleTag(UI_STYLE_ATTR);
         uiTag.textContent = UI_CSS;
+        let paintFrame = null;
         const paint = () => {
           backgroundTag.textContent = buildCss(getPrefs());
         };
+        const schedulePaint = () => {
+          if (paintFrame !== null) return;
+          if (typeof requestAnimationFrame === 'function') {
+            paintFrame = requestAnimationFrame(() => {
+              paintFrame = null;
+              paint();
+            });
+          } else {
+            paintFrame = window.setTimeout(() => {
+              paintFrame = null;
+              paint();
+            }, 16);
+          }
+        };
         paint();
-        const unsubscribe = subscribePrefs(paint);
+        const unsubscribe = subscribePrefs(schedulePaint);
         const onStorage = (event) => {
           if (event.key !== STORAGE_KEY) return;
+          if (persistTimer) {
+            window.clearTimeout(persistTimer);
+            persistTimer = 0;
+          }
           prefs = loadPrefs();
           notifyPrefs();
         };
+        const onPageHide = () => {
+          flushPrefsPersist();
+        };
         window.addEventListener('storage', onStorage);
+        window.addEventListener('pagehide', onPageHide);
         return () => {
           unsubscribe();
+          if (paintFrame !== null) {
+            if (typeof cancelAnimationFrame === 'function') {
+              cancelAnimationFrame(paintFrame);
+            } else {
+              window.clearTimeout(paintFrame);
+            }
+            paintFrame = null;
+          }
           window.removeEventListener('storage', onStorage);
+          window.removeEventListener('pagehide', onPageHide);
           backgroundTag.remove();
           uiTag.remove();
         };
