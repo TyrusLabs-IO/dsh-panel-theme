@@ -434,8 +434,11 @@ window.__ModuleLoader__.load({
         max-width: 100%;
       }
       .dst-preset-delete {
-        width: 22px;
-        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
         padding: 0;
         border: 0;
         border-radius: 50%;
@@ -1355,7 +1358,8 @@ ${contentTokens(contentMode)}
     function SidebarThemeSection({ t }) {
       const tr = typeof t === 'function' ? t : (key) => key;
       const p = usePrefs();
-      const activeMode = currentThemeMode();
+      const [themeMode, setThemeMode] = React.useState(() => currentThemeMode());
+      const activeMode = themeMode;
       const modeLabel = (mode) => tr(mode === 'dark' ? 'presets.modeDark' : 'presets.modeLight');
       const [notice, setNotice] = React.useState('');
       const [saveOpen, setSaveOpen] = React.useState(false);
@@ -1364,6 +1368,8 @@ ${contentTokens(contentMode)}
       const [importTarget, setImportTarget] = React.useState(null);
       const timer = React.useRef(0);
       const importInput = React.useRef(null);
+      const modalRef = React.useRef(null);
+      const lastFocusRef = React.useRef(null);
 
       React.useEffect(
         () => () => {
@@ -1403,6 +1409,32 @@ ${contentTokens(contentMode)}
       }, [p.enabled]);
 
       React.useEffect(() => {
+        const syncThemeMode = () => setThemeMode(currentThemeMode());
+        syncThemeMode();
+        window.addEventListener('focus', syncThemeMode);
+        let observer = null;
+        if (typeof MutationObserver === 'function' && typeof document !== 'undefined') {
+          observer = new MutationObserver(syncThemeMode);
+          if (document.documentElement) {
+            observer.observe(document.documentElement, {
+              attributes: true,
+              attributeFilter: ['data-ds-dark-theme', 'data-ds-theme-source'],
+            });
+          }
+          if (document.body) {
+            observer.observe(document.body, {
+              attributes: true,
+              attributeFilter: ['data-ds-dark-theme'],
+            });
+          }
+        }
+        return () => {
+          window.removeEventListener('focus', syncThemeMode);
+          if (observer) observer.disconnect();
+        };
+      }, []);
+
+      React.useEffect(() => {
         if (!saveOpen && !deleteTarget && !importTarget) return undefined;
         const onKeyDown = (event) => {
           if (event.key === 'Escape') {
@@ -1413,6 +1445,79 @@ ${contentTokens(contentMode)}
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
+      }, [saveOpen, deleteTarget, importTarget]);
+
+      React.useEffect(() => {
+        const dialog = modalRef.current;
+        if (!dialog) return undefined;
+        const page = typeof dialog.closest === 'function' ? dialog.closest('.dst-page') : null;
+        const backdrop = dialog.parentElement;
+        const siblings = page && backdrop && backdrop.parentElement === page
+          ? Array.from(page.children).filter((element) => element !== backdrop)
+          : [];
+        const backgroundState = siblings.map((element) => ({
+          element,
+          inert: element.inert,
+          ariaHidden: element.getAttribute('aria-hidden'),
+        }));
+        for (const element of siblings) {
+          element.inert = true;
+          element.setAttribute('aria-hidden', 'true');
+        }
+
+        const focusable = () => Array.from(
+          dialog.querySelectorAll(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((element) => !element.hasAttribute('hidden'));
+
+        const onKeyDown = (event) => {
+          if (event.key !== 'Tab') return;
+          const items = focusable();
+          if (!items.length) {
+            event.preventDefault();
+            dialog.focus();
+            return;
+          }
+          const first = items[0];
+          const last = items[items.length - 1];
+          const active = document.activeElement;
+          if (event.shiftKey) {
+            if (active === first || !dialog.contains(active)) {
+              event.preventDefault();
+              last.focus();
+            }
+          } else if (active === last || !dialog.contains(active)) {
+            event.preventDefault();
+            first.focus();
+          }
+        };
+
+        document.addEventListener('keydown', onKeyDown, true);
+        const focusTimer = window.setTimeout(() => {
+          const target =
+            dialog.querySelector('[autofocus]') || focusable()[0] || dialog;
+          if (target && typeof target.focus === 'function') target.focus();
+        }, 0);
+
+        return () => {
+          document.removeEventListener('keydown', onKeyDown, true);
+          window.clearTimeout(focusTimer);
+          for (const state of backgroundState) {
+            state.element.inert = state.inert;
+            if (state.ariaHidden === null) state.element.removeAttribute('aria-hidden');
+            else state.element.setAttribute('aria-hidden', state.ariaHidden);
+          }
+          const previous = lastFocusRef.current;
+          lastFocusRef.current = null;
+          if (previous && typeof previous.focus === 'function') {
+            try {
+              previous.focus({ preventScroll: true });
+            } catch (error) {
+              previous.focus();
+            }
+          }
+        };
       }, [saveOpen, deleteTarget, importTarget]);
 
       const flash = (message) => {
@@ -1472,7 +1577,14 @@ ${contentTokens(contentMode)}
         return `${base} ${index}`;
       };
 
+      const rememberFocus = () => {
+        if (typeof document === 'undefined') return;
+        const active = document.activeElement;
+        if (active && active !== document.body) lastFocusRef.current = active;
+      };
+
       const openSave = () => {
+        rememberFocus();
         setSaveName(nextPresetName());
         setSaveOpen(true);
       };
@@ -1548,6 +1660,7 @@ ${contentTokens(contentMode)}
       };
 
       const openImport = () => {
+        rememberFocus();
         if (!importInput.current) return;
         importInput.current.value = '';
         importInput.current.click();
@@ -1682,7 +1795,10 @@ ${contentTokens(contentMode)}
                       className: 'dst-preset-delete',
                       title: tr('presets.delete'),
                       'aria-label': `${tr('presets.delete')}: ${presetName(preset, false)}`,
-                      onClick: () => setDeleteTarget({ preset }),
+                      onClick: () => {
+                        rememberFocus();
+                        setDeleteTarget({ preset });
+                      },
                     },
                     '×',
                   ),
@@ -1917,6 +2033,8 @@ ${contentTokens(contentMode)}
                   role: 'dialog',
                   'aria-modal': 'true',
                   'aria-labelledby': 'dsh-panel-save-title',
+                  ref: modalRef,
+                  tabIndex: -1,
                 },
                 h(
                   'h3',
@@ -1990,6 +2108,8 @@ ${contentTokens(contentMode)}
                   role: 'dialog',
                   'aria-modal': 'true',
                   'aria-labelledby': 'dsh-panel-delete-title',
+                  ref: modalRef,
+                  tabIndex: -1,
                 },
                 h(
                   'h3',
@@ -2044,6 +2164,8 @@ ${contentTokens(contentMode)}
                   role: 'dialog',
                   'aria-modal': 'true',
                   'aria-labelledby': 'dsh-panel-import-title',
+                  ref: modalRef,
+                  tabIndex: -1,
                 },
                 h(
                   'h3',
